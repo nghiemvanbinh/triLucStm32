@@ -215,37 +215,38 @@ void dataSendEsp32(uint8_t punch_position,float adc){
 uint32_t adc_value; // giá tri adc
 float max_adc_value;// giá tri max adc;
 int dem_punch1 =0;
+//-----------event-v2----------//
 typedef enum{False,True}boolean;
 typedef struct{
 	uint32_t froce;
 	uint8_t position;
 	boolean havePunch;
+	uint16_t debug;
 }Punch;
 Punch punch;
+int count = 0;
 void evenPuch(){
-  //static uint32_t maxAdc;
-	static int count=0;
-	uint32_t adckalman = adcKalman(adc_value);
-	float limit = standardPressure+standardPressure*0.1;
-	if(adckalman > limit && position()!=0){
-		if(punch.froce < adckalman)
-		{
-			punch.froce = adckalman;
+//	static int count = 0; //countRising=0;
+  static uint32_t time = 0;
+	 uint32_t adckalman = adcKalman(adc_value);
+	 uint32_t limit = standardPressure+standardPressure*0.1;
+	  if(adckalman > limit){
+			punch.position = position();
+			if(punch.froce < adckalman && HAL_GetTick() - time > 300){
+				punch.froce = adckalman;
+				punch.havePunch = True;
+			}
 		}
 		else{
-			count++;
-		}
-		if(count > 10)
-		{
-			punch.havePunch = True;
-			punch.position = position();
-		}
-	}
-	if(punch.havePunch == True){
-		dataSendEsp32(punch.position,punch.froce);
-		punch.havePunch = False;
-		punch.froce = 0;
-	}
+			if(punch.havePunch == True){
+				punch.havePunch =False;
+				punch.position=punch.position == 0 ? 2: punch.position;
+				dataSendEsp32(punch.position,punch.froce);
+				punch.froce =0;
+				time = HAL_GetTick();
+				count++;
+			}
+		 }
 }
 //-----------dataSend-v1--------------------//
 void data_send(float adc, uint8_t position){
@@ -269,8 +270,7 @@ static uint8_t punch_position;
 		  dataSendEsp32(punch_position,max_adc_value);
 			max_adc_value = 0;
 			gia_tri_tiem_can = 0;
-			if(dem_punch1 ==50)dem_punch=0;
-			dem_punch1++;
+		
 		}
   }
 }
@@ -349,7 +349,6 @@ int main(void)
   {
     /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
-		//ledTest();
 	 uart_handle();
 	 switch(chooseMain){
 		 case 1:
